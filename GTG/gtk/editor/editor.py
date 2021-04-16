@@ -28,7 +28,7 @@ import datetime
 import logging
 import os
 
-from gettext import gettext as _, ngettext
+from gettext import gettext as _
 
 from gi.repository import Gdk, Gtk, Pango
 from gi.repository.GObject import signal_handler_block
@@ -822,14 +822,3 @@ class TaskEditor:
         except KeyError:
             log.debug('Task %s was already removed from the open list', tid)
 
-    def get_builder(self):
-        return self.builder
-
-    def get_task(self):
-        return self.task
-
-    def get_textview(self):
-        return self.textview
-
-    def get_window(self):
-        return self.window
