@@ -291,6 +291,8 @@ class TaskEditor:
         self.closed_popover.popup()
 
     def open_tags_popover(self):
+        """Open the tags popover."""
+
         self.tag_store.clear()
 
         tags = self.req.get_tag_tree().get_all_nodes()
@@ -309,8 +311,9 @@ class TaskEditor:
                 """
 
     def on_tag_toggled(self, widget, path, column):
-        """We toggle by tag_row variable. tag_row is
-        meant to be a tuple (is_used, tagname)"""
+        """We toggle by tag_row variable. tag_row is meant to be a tuple
+        (is_used, tagname)"""
+
         tag_row = self.tag_store[path]
         tag_row[0] = not tag_row[0]
 
@@ -322,6 +325,7 @@ class TaskEditor:
 
     def on_repeat_icon_toggled(self, widget):
         """ Reset popup stack to the first page every time you open it """
+
         if widget.get_active():
             self.recurring_menu.reset_stack()
 
@@ -665,14 +669,16 @@ class TaskEditor:
         self.app.open_task(tid)
         self.app.close_task(task.parents[0])
 
-    # Take the title as argument and return the subtask ID
     def new_subtask(self, title=None, tid=None):
+        """Callback to add a new subtask or parent an existing task."""
+
         if tid:
             self.task.add_child(tid)
         elif title:
             subt = self.task.new_subtask()
             subt.set_title(title)
             tid = subt.get_id()
+
         return tid
 
     def remove_subtask(self, tid):
@@ -689,8 +695,9 @@ class TaskEditor:
             # There's no task at that tid
             pass
 
-
     def insert_subtask(self, action=None, param=None):
+        """Insert an existing subtask into the taskview."""
+
         self.textview.insert_new_subtask()
         self.textview.grab_focus()
 
