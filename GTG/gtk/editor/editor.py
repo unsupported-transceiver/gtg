@@ -1,6 +1,7 @@
 # -----------------------------------------------------------------------------
 # Getting Things GNOME! - a personal organizer for the GNOME desktop
 # Copyright (c) 2008-2013 - Lionel Dricot & Bertrand Rousseau
+# Copyright (c) 2019-2021 - Diego Gangl & the GTG Team
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -16,16 +17,18 @@
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 """
-This is the TaskEditor
+Task Editor UI
 
 It's the window you see when you double-click on a Task
-The main text widget is a home-made TextView called TaskView (see taskview.py)
-The rest is the logic of the widget: date changing widgets, buttons, ...
+The main text widget is a custom TextView called TaskView (see taskview.py)
 """
+
 import time
 import datetime
 import logging
 import os
+
+from gettext import gettext as _, ngettext
 
 from gi.repository import Gdk, Gtk, Pango
 from gi.repository.GObject import signal_handler_block
@@ -34,40 +37,35 @@ from GTG.core.dirs import UI_DIR
 from GTG.core.plugins.api import PluginAPI
 from GTG.core.plugins.engine import PluginEngine
 from GTG.core.task import Task
-from gettext import gettext as _, ngettext
+from GTG.core.dates import Date
 from GTG.gtk.editor import GnomeConfig
 from GTG.gtk.editor.calendar import GTGCalendar
 from GTG.gtk.editor.recurring_menu import RecurringMenu
 from GTG.gtk.editor.taskview import TaskView
 from GTG.gtk.tag_completion import tag_filter
-from GTG.core.dates import Date
-"""
-TODO (jakubbrindza): re-factor tag_filter into a separate module
-"""
+
 
 log = logging.getLogger(__name__)
 
 
-class TaskEditor():
+class TaskEditor:
 
     EDITOR_UI_FILE = os.path.join(UI_DIR, "task_editor.ui")
 
-    def __init__(self,
-                 requester,
-                 app,
-                 task,
-                 thisisnew=False,
-                 clipboard=None):
+    def __init__(self, requester, app, task, thisisnew=False, clipboard=None):
         """
         req is the requester
         app is the view manager
         thisisnew is True when a new task is created and opened
         """
+
         self.req = requester
         self.app = app
         self.browser_config = self.req.get_config('browser')
         self.config = self.req.get_task_config(task.get_id())
         self.time = None
+        self.task = task
+
         self.clipboard = clipboard
         self.builder = Gtk.Builder()
         self.builder.add_from_file(self.EDITOR_UI_FILE)
@@ -193,14 +191,6 @@ class TaskEditor():
         self.textview.connect('focus-in-event', self.on_textview_focus_in)
         self.textview.connect('focus-out-event', self.on_textview_focus_out)
 
-        """
-        TODO(jakubbrindza): Once all the functionality in editor is back and
-        working, bring back also the accelerators! Dayleft_label needs to be
-        brought back, however its position is unsure.
-        """
-        # self.dayleft_label = self.builder.get_object("dayleft")
-
-        self.task = task
         tags = task.get_tags()
         text = self.task.get_text()
         title = self.task.get_title()
@@ -520,58 +510,10 @@ class TaskEditor():
         if closeddate != prevcldate:
             self.closed_entry.set_text(str(closeddate))
 
-        # refreshing the day left label
-        """
-        TODO(jakubbrindza): re-enable refreshing the day left.
-        We need to come up how and where this information is viewed
-        in the editor window.
-        """
-        # self.refresh_day_left()
-
         if refreshtext:
             self.textview.modified(refresheditor=False)
         if to_save:
             self.light_save()
-
-    def refresh_day_left(self):
-        # If the task is marked as done, we display the delay between the
-        # due date and the actual closing date. If the task isn't marked
-        # as done, we display the number of days left.
-        status = self.task.get_status()
-        if status in [Task.STA_DISMISSED, Task.STA_DONE]:
-            delay = self.task.get_days_late()
-            if delay is None:
-                txt = ""
-            elif delay == 0:
-                txt = "Completed on time"
-            elif delay >= 1:
-                txt = ngettext("Completed %(days)d day late",
-                               "Completed %(days)d days late", delay) % \
-                    {'days': delay}
-            elif delay <= -1:
-                abs_delay = abs(delay)
-                txt = ngettext("Completed %(days)d day early",
-                               "Completed %(days)d days early", abs_delay) % \
-                    {'days': abs_delay}
-        else:
-            due_date = self.task.get_due_date()
-            result = due_date.days_left()
-            if due_date.is_fuzzy():
-                txt = ""
-            elif result > 0:
-                txt = ngettext("Due tomorrow!", "%(days)d days left", result)\
-                    % {'days': result}
-            elif result == 0:
-                txt = _("Due today!")
-            elif result < 0:
-                abs_result = abs(result)
-                txt = ngettext("Due yesterday!", "Was %(days)d days ago",
-                               abs_result) % {'days': abs_result}
-
-        style_context = self.window.get_style_context()
-        color = style_context.get_color(Gtk.StateFlags.INSENSITIVE).to_color()
-        self.dayleft_label.set_markup(
-            f"<span color='{color.to_string()}'>{txt}</span>")
 
     def reload_editor(self):
         task = self.task
@@ -891,4 +833,3 @@ class TaskEditor():
 
     def get_window(self):
         return self.window
-# -----------------------------------------------------------------------------
