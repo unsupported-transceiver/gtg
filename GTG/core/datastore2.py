@@ -22,14 +22,16 @@ import os
 import threading
 import logging
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import time
 from collections import Counter
+import random
 
 from GTG.core.tasks2 import TaskStore
 from GTG.core.tags2 import TagStore
 from GTG.core.saved_searches import SavedSearchStore
 from GTG.core import firstrun_tasks
+from GTG.core.dates import Date
 from GTG.backends.backend_signals import BackendSignals
 from GTG.backends.generic_backend import GenericBackend
 import GTG.core.info as info
@@ -540,3 +542,109 @@ class Datastore2:
         t.start()
         self.backends[backend_id].start_get_tasks()
 
+
+    # --------------------------------------------------------------------------
+    # TESTING AND UTILS
+    # --------------------------------------------------------------------------
+
+    def fill_with_samples(self, tasks_count: int) -> None:
+        """Fill the Datastore with sample data."""
+
+        def random_date(start: datetime = None):
+            start = start or datetime.now()
+            end = start + timedelta(days=random.randint(1, 365 * 5))
+
+            return start + (end - start)
+
+
+        def random_boolean() -> bool:
+            return bool(random.getrandbits(1))
+
+
+        if tasks_count == 0:
+            return
+
+        dirname = os.path.dirname(__file__)
+        words_file = os.path.join(dirname, 'sample_words.txt')
+        words = open(words_file).read().splitlines()
+
+        tags_count = random.randint(tasks_count // 10, tasks_count)
+        search_count = random.randint(0, tasks_count // 10)
+        tag_words = random.sample(words, tags_count)
+        task_sizes = [random.randint(0, 200) for _ in range(10)]
+
+        # Generate saved searches
+        for _ in range(search_count):
+            self.saved_searches.new(random.choice(words), random.choice(words))
+
+        # Generate tags
+        for tag_name in tag_words:
+            tag = self.tags.new(tag_name)
+            tag.actionable = random_boolean()
+            tag.color = self.tags.generate_color()
+
+
+        # Parent the tags
+        for tag in self.tags.data:
+            if bool(random.getrandbits(1)):
+                parent = random.choice(self.tags.data)
+
+                if tag.id == parent.id:
+                    continue
+
+                self.tags.parent(tag.id, parent.id)
+
+
+        # Generate tasks
+        for _ in range(tasks_count):
+            title = ''
+            content = ''
+            content_size = random.choice(task_sizes)
+
+            for _ in range(random.randint(1, 15)):
+                word = random.choice(words)
+
+                if word in tag_words:
+                    word = '@' + word
+
+                title += word + ' '
+
+            task = self.tasks.new(title)
+
+            for _ in range(random.randint(0, 10)):
+                tag = self.tags.find(random.choice(tag_words))
+                task.add_tag(tag)
+
+            if random_boolean():
+                task.toggle_status()
+
+            if random_boolean():
+                task.dismiss()
+
+            for _ in range(random.randint(0, content_size)):
+                word = random.choice(words)
+
+                if word in tag_words:
+                    word = '@' + word
+
+                content += word + ' '
+                content += '\n' if random_boolean() else ''
+
+            task.content = content
+
+            if random_boolean():
+                task.date_start = random_date()
+
+            if random_boolean():
+                task.date_due = Date(random_date())
+
+
+        # Parent the tasks
+        for task in self.tasks.data:
+            if bool(random.getrandbits(1)):
+                parent = random.choice(self.tasks.data)
+
+                if task.id == parent.id:
+                    continue
+
+                self.tasks.parent(task.id, parent.id)
