@@ -35,11 +35,13 @@ from GTG.core.plugins.engine import PluginEngine
 from GTG.core.plugins.api import PluginAPI
 from GTG.backends import BackendFactory
 from GTG.core.datastore import DataStore
+from GTG.core.datastore2 import Datastore2
 from GTG.core.dirs import CSS_DIR
 from GTG.core.dates import Date
 from GTG.gtk.backends import BackendsDialog
 from GTG.gtk.browser.tag_editor import TagEditor
 from GTG.core.timer import Timer
+from GTG.core.dirs import DATA_DIR
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +95,7 @@ class Application(Gtk.Application):
 
         # Register backends
         datastore = DataStore()
+        self.ds = Datastore2()
 
         for backend_dic in BackendFactory().get_saved_backends_list():
             datastore.register_backend(backend_dic)
@@ -101,6 +104,9 @@ class Application(Gtk.Application):
         datastore.save(quit=False)
 
         self.req = datastore.get_requester()
+        
+        data_path = os.path.join(DATA_DIR, 'gtg_data.xml')
+        self.ds.load_file(data_path)
 
         self.config = self.req.get_config("browser")
         self.config_plugins = self.req.get_config("plugins")
