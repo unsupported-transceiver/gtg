@@ -39,6 +39,7 @@ gtg_browser_sources = [
   'browser/tag_editor.py',
   'browser/treeview_factory.py',
   'browser/quick_add.py',
+  'browser/sidebar.py',
 ]
 
 gtg_data_sources = [

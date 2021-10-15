@@ -32,6 +32,7 @@ from GTG.core.tag import SEARCH_TAG
 from GTG.core.task import Task
 from gettext import gettext as _
 from GTG.gtk.browser import GnomeConfig
+from GTG.gtk.browser.sidebar import Sidebar
 from GTG.gtk.browser import quick_add
 from GTG.gtk.browser.backend_infobar import BackendInfoBar
 from GTG.gtk.browser.modify_tags import ModifyTagsDialog
@@ -96,6 +97,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.vtree_panes['closed'] = \
             self.tv_factory.closed_tasks_treeview(self.closedtree)
 
+
         # YOU CAN DEFINE YOUR INTERNAL MECHANICS VARIABLES BELOW
         # Setup GTG icon theme
         self._init_icon_theme()
@@ -103,9 +105,6 @@ class MainWindow(Gtk.ApplicationWindow):
         # Init Actions
         self._set_actions()
 
-        # Tags
-        self.tagtree = None
-        self.tagtreeview = None
 
         # Load window tree
         self.builder = Gtk.Builder()
@@ -114,6 +113,8 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # Define aliases for specific widgets to reuse them easily in the code
         self._init_widget_aliases()
+        self.new_sidebar = Sidebar(app, self.builder)
+
         self.sidebar.connect('notify::visible', self._on_sidebar_visible)
         self.add_action(Gio.PropertyAction.new('sidebar', self.sidebar, 'visible'))
 
@@ -144,6 +145,8 @@ class MainWindow(Gtk.ApplicationWindow):
         app.timer.connect('refresh', self._set_defer_days)
 
         self.stack_switcher.get_stack().connect('notify::visible-child', self.on_pane_switch)
+
+        # self.sidebar_container.add(self.tag_sidebar)
 
         # This needs to be called again after setting everything up,
         # so the buttons start disabled
@@ -258,7 +261,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.defer_menu_btn = self.builder.get_object("defer_menu_btn")
         self.help_overlay = self.builder.get_object("shortcuts")
 
-        self.tagpopup = TagContextMenu(self.req, self.app)
+        # self.tagpopup = TagContextMenu(self.req, self.app)
 
     def _init_ui_widget(self):
         """ Sets the main pane with three trees for active tasks,
@@ -295,27 +298,7 @@ class MainWindow(Gtk.ApplicationWindow):
         """
         initializes the tagtree (left area with tags and searches)
         """
-        self.tagtree = self.req.get_tag_tree()
-        self.tagtreeview = self.tv_factory.tags_treeview(self.tagtree)
-        self.tagtreeview.get_selection().connect('changed', self.on_select_tag)
-        self.tagtreeview.connect('button-press-event', self.on_tag_treeview_button_press_event)
-        self.tagtreeview.connect('key-press-event', self.on_tag_treeview_key_press_event)
-        self.tagtreeview.connect('node-expanded', self.on_tag_expanded)
-        self.tagtreeview.connect('node-collapsed', self.on_tag_collapsed)
-        self.sidebar_container.add(self.tagtreeview)
-
-        for path_t in self.config.get("expanded_tags"):
-            # the tuple was stored as a string. we have to reconstruct it
-            path = ()
-            for p in path_t[1:-1].split(","):
-                p = p.strip(" '")
-                path += (p, )
-            if path[-1] == '':
-                path = path[:-1]
-            self.tagtreeview.expand_node(path)
-
-        # expanding search tag does not work automatically, request it
-        self.expand_search_tag()
+        pass
 
     def _init_about_dialog(self):
         """
@@ -479,11 +462,6 @@ class MainWindow(Gtk.ApplicationWindow):
         # Try if this is a new search tag and save it correctly
         tag_id = self.req.new_search_tag(query)
 
-        # Apply new search right now
-        if self.tagtreeview is not None:
-            self.select_search_tag(tag_id)
-        else:
-            self.get_selected_tree().apply_filter(tag_id)
 
     def select_search_tag(self, tag_id):
         tag = self.req.get_tag(tag_id)
@@ -685,8 +663,6 @@ class MainWindow(Gtk.ApplicationWindow):
         assert param.name == 'visible'
         visible = obj.get_property(param.name)
         self.config.set("tag_pane", visible)
-        if visible and not self.tagtreeview:
-            self.init_tags_sidebar()
 
     def on_collapse_all_tasks(self, action, param):
         """Collapse all tasks."""
@@ -764,7 +740,6 @@ class MainWindow(Gtk.ApplicationWindow):
     def focus_sidebar(self, action, param):
         """Callback to focus the sidebar widget."""
         self.sidebar.props.visible = True
-        self.tagtreeview.grab_focus()
 
     def on_quickadd_focus_in(self, widget, event):
         self.toggle_delete_accel(False)
@@ -934,7 +909,6 @@ class MainWindow(Gtk.ApplicationWindow):
             self.req.delete_tag(tagname)
             tag = self.req.get_tag(tagname)
             self.app.reload_opened_editors(tag.get_related_tasks())
-        self.tagtreeview.set_cursor(0)
         self.on_select_tag()
 
     def on_task_treeview_button_press_event(self, treeview, event):
@@ -1434,8 +1408,6 @@ class MainWindow(Gtk.ApplicationWindow):
         @param nospecial: doesn't return tags that do not stat with
         """
         taglist = []
-        if self.tagtreeview:
-            taglist = self.tagtreeview.get_selected_nodes()
         # If no selection, we display all
         if not nospecial and (not taglist or len(taglist) < 0):
             taglist = ['gtg-tags-all']
@@ -1455,19 +1427,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def select_on_sidebar(self, value):
         """Select a row in the tag treeview (by value)."""
-
-        try:
-            selection = self.tagtreeview.get_selection()
-
-        except AttributeError:
-            # tagtreeview is None if it's hidden
-            return
-
-        model = self.tagtreeview.get_model()
-        tree_iter = model.get_iter_first()
-
-        result = self.find_value_in_treestore(model, tree_iter, value)
-        selection.select_iter(result)
+        pass
 
     def reset_cursor(self):
         """ Returns the cursor to the tag that was selected prior
@@ -1477,8 +1437,6 @@ class MainWindow(Gtk.ApplicationWindow):
         if self.tag_active:
             self.tag_active = False
             path, col = self.previous_cursor
-            if self.tagtreeview:
-                self.tagtreeview.set_cursor(path, col, 0)
 
     def set_target_cursor(self):
         """ Selects the last tag to be right clicked.
@@ -1491,8 +1449,6 @@ class MainWindow(Gtk.ApplicationWindow):
         if not self.tag_active:
             self.tag_active = True
             path, col = self.target_cursor
-            if self.tagtreeview:
-                self.tagtreeview.set_cursor(path, col, 0)
 
     def add_page_to_sidebar_notebook(self, icon, page):
         """Adds a new page tab to the left panel.  The tab will
@@ -1646,19 +1602,11 @@ class MainWindow(Gtk.ApplicationWindow):
 # SEARCH RELATED STUFF ########################################################
     def get_selected_search(self):
         """ return just one selected view """
-        if self.tagtreeview:
-            tags = self.tagtreeview.get_selected_nodes()
-            if len(tags) > 0:
-                tag = self.tagtree.get_node(tags[0])
-                if tag.is_search_tag():
-                    return tags[0]
+
         return None
 
     def expand_search_tag(self):
         """ For some unknown reason, search tag is not expanded correctly and
         it must be done manually """
-        if self.tagtreeview is not None:
-            model = self.tagtreeview.get_model()
-            search_iter = model.my_get_iter((SEARCH_TAG, ))
-            search_path = model.get_path(search_iter)
-            self.tagtreeview.expand_row(search_path, False)
+        
+        pass
